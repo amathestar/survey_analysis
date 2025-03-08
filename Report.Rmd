@@ -1,0 +1,236 @@
+---
+title: "Project 1"
+author: "Ama Agyemang-Duah"
+date: 01/03/2025
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Conference Survey Project
+
+This project is an analysis of data gathered from a survey of participants at a conference in
+the Netherlands.
+
+### IMPPORTING OF PACKAGES REQUIRED FOR THE ANALYSIS & LOADING SURVEY DATA
+
+```{r message=FALSE, warning=FALSE}
+
+library(readr) #importing package to read CSV file(*in tidyverse)
+library(visdat) #this package makes it easy to visualise the whole dataset
+library(dplyr) # importing this package to access data manipulating functions (*in tidyverse)
+library(stringr) #this package provides string functions(*in tidyverse)
+library(janitor) #importing this package to clean dataset
+library(tidyr) #importing make data consistent form. (*in tidyverse)
+library(ggplot2) #importing package to plot graphs and plots (*in tidyverse)
+
+survey <- read_csv("data/survey.csv/survey.csv") #importing survey data 
+
+
+```
+
+### PART 1: EXPLORING AND CLEANING SURVEY DATA
+
+```{r}
+
+dim(survey)  #retrieving dimensions of survey data to know number of participants and number of columns
+
+nrow(survey) #another way to retrieve the number of participants
+
+names(survey) <-str_to_lower(str_replace_all(names(survey)," ","_")) #replaced all spaces with _ and changed the column names to lower case
+
+names(survey) #displays column names
+
+survey <- survey %>%
+  rename("no" = `...1`) #renamed first column to `no`
+
+survey %>% clean_names() #cleaning data. function is from janitor
+
+vis_miss(survey) #This is to check whether there are any miss in values or observations
+
+```
+
+COMMENT ON ORIGINAL DATA: THERE ARE NO MISSING VALUES
+
+#### -\>Showing The Number Of Survey Participants, Data types of attibutes or columnts & Top 3 Universities
+
+```{r}
+
+str(survey) #shows the structure of the data as well as data types
+
+#Storing the number of participants per university in descending order in grouped_uni_data table
+grouped_uni_data <-survey %>%
+  group_by(university) %>%
+  summarise(count=n())  %>%
+  arrange(desc(count))
+
+#Showing the top 3 of the list above 
+head(grouped_uni_data,3)
+```
+
+#### -\>Survey Summary Findings
+
+THERE ARE:
+
+1.  30 Survey Participants
+
+2.  a)no, number_of_employees,
+    number_of_phd_students,number_of_postdocs, number_of_professors are
+    double data types
+
+    b)university, position,sizes are character data types
+
+3.  The top 3 Universities with the most survey participants:
+
+    Deft University of Technology,
+
+    Eindhoven University of Technology,
+
+    University of Groningen
+
+### PART 2: INFORMATION ON THE NUMBER OF SURVEY PARTICIPANTS FOR DIFFERENT POSITIONS
+
+```{r}
+
+#group survey data by position and count the number of participants in each position
+grouped_position_data <- survey %>%
+        group_by(position)%>%
+        summarise(count = n())
+
+View(grouped_position_data) #Viewing the count of groupes of positions
+
+```
+
+#### -\>Bar Chart to show the Number Of Survey Participants For Different Positions
+
+```{r}
+      #plotting bar chart of the total count of  per positions
+      ggplot(data = grouped_position_data,
+       mapping = aes(x = count, 
+                     y = position, 
+                    fill = position)) + 
+      geom_col() +
+      labs(title = "Number of survey participant by position",
+       subtitle = "The most common positions were Postdocs and PhDs",
+       caption = "Source: Survey Dataset",
+       x = "count",
+       y = "position")
+      
+```
+
+### PART 3: RECREATING THE `Sizes` COLUMN CORRECTLY BASED ON NUMBER OF EMPLOYEES
+
+```{r}
+  #using case_when to create corrected_sizes column based on new conditions
+  #small (0 to 20), "Medium (21 to 50), "Large (51 to 200), "Extra Large (over 200)"
+  corrected_survey_data <-survey %>%
+  mutate (corrected_sizes = case_when(
+           (`number_of_employees`) <= 20 ~ "Small (0 to 20)",
+          (`number_of_employees`) > 20 & (`number_of_employees`) <= 50 ~ "Medium (21 to 50)",
+          (`number_of_employees`) > 51 & (`number_of_employees`) <= 200 ~ "Large (51 to 200)",
+          TRUE ~ "Extra Large (over 200)"))
+
+  #Can also use cut functions eg_cut(data, breaks=c(0,20,50,200,Inf),c( "Small (0 to 20)","Medium (21 to 50)","Large (51 to 200)","Extra Large (over 200)"))
+
+names(corrected_survey_data) #viewing all column names including newly added corrected_sizes
+```
+
+#### -\>Retrieving the Count of each Corrected Size Category
+
+```{r}
+
+  #counting the number of participants in each corrected_sizes category
+  grouped_corrected_sizes_data <- corrected_survey_data %>%
+        group_by(corrected_sizes)%>%
+        summarise(count = n())
+
+  View(grouped_corrected_sizes_data) #displaying the corrected survey with corrected size data
+
+
+```
+
+#### -\>Plotting Bar Chart Of The Total Size In Each Bin(Eg:Small, Medium, Large, Extra Large)
+
+```{r}
+      #plotting bar chart of the total size in each bin
+      ggplot(data = grouped_corrected_sizes_data,
+       mapping = aes(x = corrected_sizes, 
+                     y = count, 
+                    fill = corrected_sizes)) + 
+      geom_bar( stat="identity") +
+      labs(title = "Number of survey participant by size of their group",
+       subtitle = "Most common gruop size among participants was `small`",
+       caption = "Source: Survey Dataset",
+       x = "corrected sizes",
+       y = "count")
+
+```
+
+### PART 4: RETRIEVING DATA OF PERCENTAGE EMPOYEES THAT ARE PHD STUDENTS, POSTDOCS AND PROFESSORS PER RESEARCH GROUP
+
+```{r}
+
+  group_perc_uni_data <-survey %>%
+  group_by(university) %>%
+  mutate( `percent_PhD_students` =(`number_of_phd_students`/`number_of_employees`*100),
+          `percent_postDocs` =(`number_of_postdocs`/`number_of_employees`*100),
+          `percent_professors` =(`number_of_professors`/`number_of_employees`*100))
+  
+
+  View(group_perc_uni_data)
+
+```
+
+#### -\> Reshaping Data For Stacked Plot Plotting Stacked Horizontal Bar Plot
+
+```{r}
+
+# Reshape data so that columns with percent are reshaped to a vertical shape
+df_long <- group_perc_uni_data %>%
+  pivot_longer(cols = starts_with("percent"), # Select columns to pivot
+               names_to = "percent",          # New column for variable names
+               values_to = "percentage_of_employees")        # New column for values
+
+
+View(df_long) #displaying the percentage of employees survey for each research group id
+
+# Creating the stacked horizontal bar plot
+ggplot(df_long, 
+        aes(x = `no`,y = `percentage_of_employees`, fill = `percent`)) +
+        geom_col() +      
+        coord_flip() +    
+        labs(title = "Stacked Plot: Employees role percentage for each group",
+             subtitle = "We can see that groups can have very different splits",
+             y = "Percentage(%)",
+             x = "Research group id",
+             fill = "Employee Type") +
+        theme_minimal() 
+
+
+
+```
+
+#### -\> Using Project1_Part4Chart Data (Provided in Resources Folder)
+
+```{r}
+project1_part4_chart_data <-  read_csv("data/project1_part4_chart_data.csv/project1_part4_chart_data.csv")
+
+View(project1_part4_chart_data)
+
+# Create the stacked horizontal bar plot
+ggplot(project1_part4_chart_data, 
+        aes(x = survey_id, y = percentage, fill = `employee_type`)) +
+        geom_col() +      
+        coord_flip() +  
+        labs(title = "Stacked Horizontal Bar Plot ",
+             subtitle = "Using project1_part4_chart_data",
+             x = "Research group id",
+             y = "Percentage",
+             fill = "Employee Type") +
+        theme_minimal() 
+
+```
+
